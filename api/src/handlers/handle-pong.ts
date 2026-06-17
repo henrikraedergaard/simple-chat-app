@@ -2,9 +2,11 @@ import { clients } from "../index.js";
 import type { PongMessage } from "../types/ws-message.js";
 
 export function handlePong(message: PongMessage) {
-	const client = clients.get(message.userId);
-
-	if (client) {
-		client.lastSeen = Date.now();
+	for (const client of clients) {
+		if (client.id === message.userId) {
+			console.log("Client ponged");
+			client.lastSeen = Date.now();
+			break;
+		}
 	}
 }

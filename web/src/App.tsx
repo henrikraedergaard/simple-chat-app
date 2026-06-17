@@ -1,80 +1,157 @@
-import { useEffect, useRef, useState } from "react";
+import type { UUID } from "crypto";
 import { XIcon } from "lucide-react";
-import type {
-	ChatMessage,
-	ConnectMessage,
-	DisconnectMessage,
-	PongMessage,
-	WsMessage,
-} from "./types/ws-message";
+import { useEffect, useRef, useState } from "react";
+import { handleAnswer } from "./handlers/handle-answer";
+import { handleOffer } from "./handlers/handle-offer";
+import { handlePing } from "./handlers/handle-ping";
+import type { CandidateMessage, WsMessage } from "./types/ws-message";
 
 const App = () => {
 	const wsRef = useRef<WebSocket | null>(null);
+	const pcRef = useRef<RTCPeerConnection | null>(null);
+	const clientIdRef = useRef<UUID | null>(null);
+	const participants = useRef<UUID[]>([]);
+	const channelRef = useRef<RTCDataChannel | null>(null);
+	const [messages, setMessages] = useState<string[]>([]);
 
-	const [clientId, setClientId] = useState("");
-	const [participants, setParticipants] = useState(0);
+	const createOffers = async (clientId: UUID, participants: UUID[]) => {
+		if (!pcRef.current) return;
+		if (!wsRef.current) return;
+
+		const channel = pcRef.current.createDataChannel("chat");
+		channelRef.current = channel;
+
+		channel.onmessage = (event) => {
+			setMessages((prev) => [...prev, event.data]);
+		};
+
+		channel.onopen = () => {
+			console.log("DATA CHANNEL OPEN");
+		};
+
+		channel.onclose = () => {
+			console.log("DATA CHANNEL CLOSED");
+		};
+
+		channel.onerror = (err) => {
+			console.log("DATA CHANNEL ERROR", err);
+		};
+
+		const offer = await pcRef.current.createOffer();
+		await pcRef.current.setLocalDescription(offer);
+
+		for (const participant of participants) {
+			if (participant === clientId) continue;
+
+			wsRef.current.send(
+				JSON.stringify({
+					type: "offer",
+					to: participant,
+					from: clientId,
+					offer,
+				}),
+			);
+		}
+	};
 
 	useEffect(() => {
+		if (wsRef.current || pcRef.current) {
+			return;
+		}
+
 		const ws = new WebSocket("ws://localhost:3000/ws");
+		const pc = new RTCPeerConnection({
+			iceServers: [
+				{
+					urls: "stun:stun.l.google.com:19302",
+				},
+			],
+		});
 
-		ws.onopen = () => {
-			const message: ConnectMessage = {
-				type: "connect",
+		wsRef.current = ws;
+		pcRef.current = pc;
+
+		pc.onicecandidate = (event) => {
+			if (!event.candidate) return;
+			if (!clientIdRef.current) return;
+
+			const message: CandidateMessage = {
+				type: "candidate",
+				candidate: event.candidate,
+				from: clientIdRef.current,
 			};
-
 			ws.send(JSON.stringify(message));
 		};
 
-		ws.onmessage = (event) => {
-			const message: WsMessage = JSON.parse(event.data.toString());
+		pc.onconnectionstatechange = () => {
+			console.log("connection:", pc.connectionState);
+		};
 
-			if (message.type === "channel-info") {
-				setParticipants(message.participants);
-				setClientId(message.clientId);
+		pc.oniceconnectionstatechange = () => {
+			console.log("ice:", pc.iceConnectionState);
+		};
+
+		pc.onsignalingstatechange = () => {
+			console.log("signaling:", pc.signalingState);
+		};
+
+		ws.onmessage = (event) => {
+			const message: WsMessage = JSON.parse(event.data);
+
+			if (message.type === "session-init") {
+				clientIdRef.current = message.clientId;
+				participants.current = message.participants;
+
+				createOffers(message.clientId, message.participants);
 				return;
 			}
 
 			if (message.type === "ping") {
-				const response: PongMessage = {
-					type: "pong",
-					userId: "some-user-id",
+				if (!clientIdRef.current) return;
+
+				handlePing(clientIdRef.current, ws);
+				return;
+			}
+
+			if (message.type === "candidate") {
+				pc.addIceCandidate(new RTCIceCandidate(message.candidate));
+			}
+
+			if (message.type === "offer") {
+				if (!clientIdRef.current) return;
+
+				handleOffer(pc, message, clientIdRef.current, ws);
+				pc.ondatachannel = (event) => {
+					channelRef.current = event.channel;
+
+					event.channel.onmessage = (messageEvent) => {
+						setMessages((prev) => [...prev, messageEvent.data]);
+					};
 				};
 
-				ws.send(JSON.stringify(response));
+				return;
+			}
+
+			if (message.type === "answer") {
+				handleAnswer(pc, message);
 				return;
 			}
 		};
 
-		ws.onclose = () => {
-			console.log("Disconnected");
-		};
-
-		ws.onerror = (error) => {
-			console.error(error);
-		};
-
-		wsRef.current = ws;
-
 		return () => {
-			if (ws.readyState === WebSocket.OPEN) {
-				const message: DisconnectMessage = {
-					type: "disconnect",
-					userId: "my-user-id",
-				};
-				ws.send(JSON.stringify(message));
-				ws.close();
-			}
+			if (ws.readyState === WebSocket.OPEN) ws.close();
+			if (pc.connectionState === "connected") pc.close();
 		};
 	}, []);
 
-	function sendMessage() {
-		const message: ChatMessage = {
-			type: "chat",
-			userId: clientId,
-			body: "Hello everyone",
-		};
-		wsRef.current?.send(JSON.stringify(message));
-	}
+	const sendMessage = () => {
+		if (!channelRef.current) return;
+		console.log(channelRef.current.readyState);
+
+		channelRef.current.send("Hello from WebRTC!");
+
+		setMessages((prev) => [...prev, "You: Hello from WebRTC!"]);
+	};
 
 	return (
 		<div>
@@ -83,9 +160,26 @@ const App = () => {
 				<XIcon />
 			</header>
 
-			<main>
-				<p>Participants ({participants})</p>
-				<button onClick={() => sendMessage()}>Send Message</button>
+			<main className="p-4">
+				<div className="border rounded p-4 h-80 overflow-y-auto mb-4">
+					{messages.length === 0 ? (
+						<p className="text-gray-500">No messages yet</p>
+					) : (
+						messages.map((message, index) => (
+							<div key={index} className="mb-2">
+								{message}
+							</div>
+						))
+					)}
+				</div>
+
+				<button
+					type="button"
+					onClick={sendMessage}
+					className="px-4 py-2 bg-black text-white rounded"
+				>
+					Send Test Message
+				</button>
 			</main>
 		</div>
 	);

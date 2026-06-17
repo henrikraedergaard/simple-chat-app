@@ -1,22 +1,9 @@
-export type ConnectMessage = {
-	type: "connect";
-};
+import type { UUID } from "crypto";
 
-export type DisconnectMessage = {
-	type: "disconnect";
-	userId: string;
-};
-
-export type ChatMessage = {
-	type: "chat";
-	body: string;
-	userId: string;
-};
-
-export type ChannelInfoMessage = {
-	type: "channel-info";
-	participants: number;
-	clientId: string;
+export type SessionInitMessage = {
+	type: "session-init";
+	participants: UUID[];
+	clientId: UUID;
 };
 
 export type PingMessage = {
@@ -25,13 +12,33 @@ export type PingMessage = {
 
 export type PongMessage = {
 	type: "pong";
-	userId: string;
+	userId: UUID;
+};
+
+export type OfferMessage = {
+	type: "offer";
+	from: UUID;
+	to: UUID;
+	offer: RTCSessionDescriptionInit;
+};
+
+export type AnswerMessage = {
+	type: "answer";
+	from: UUID;
+	to: UUID;
+	answer: RTCSessionDescriptionInit;
+};
+
+export type CandidateMessage = {
+	type: "candidate";
+	candidate: RTCIceCandidate;
+	from: UUID;
 };
 
 export type WsMessage =
-	| ConnectMessage
-	| DisconnectMessage
-	| ChatMessage
-	| ChannelInfoMessage
+	| SessionInitMessage
 	| PingMessage
-	| PongMessage;
+	| PongMessage
+	| CandidateMessage
+	| OfferMessage
+	| AnswerMessage;
