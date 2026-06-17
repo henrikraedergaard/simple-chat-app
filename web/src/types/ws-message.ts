@@ -35,10 +35,22 @@ export type CandidateMessage = {
 	from: UUID;
 };
 
+export type ConnectMessage = {
+	type: "connect";
+	clientId: UUID;
+};
+
+export type DisconnectMessage = {
+	type: "disconnect";
+	clientId: UUID;
+};
+
 export type WsMessage =
 	| SessionInitMessage
 	| PingMessage
 	| PongMessage
 	| CandidateMessage
 	| OfferMessage
-	| AnswerMessage;
+	| AnswerMessage
+	| ConnectMessage
+	| DisconnectMessage;

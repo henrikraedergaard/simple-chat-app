@@ -10,7 +10,7 @@ const App = () => {
 	const wsRef = useRef<WebSocket | null>(null);
 	const pcRef = useRef<RTCPeerConnection | null>(null);
 	const clientIdRef = useRef<UUID | null>(null);
-	const participants = useRef<UUID[]>([]);
+	const [participants, setParticipants] = useState<UUID[]>([]);
 	const channelRef = useRef<RTCDataChannel | null>(null);
 	const [messages, setMessages] = useState<string[]>([]);
 
@@ -83,24 +83,12 @@ const App = () => {
 			ws.send(JSON.stringify(message));
 		};
 
-		pc.onconnectionstatechange = () => {
-			console.log("connection:", pc.connectionState);
-		};
-
-		pc.oniceconnectionstatechange = () => {
-			console.log("ice:", pc.iceConnectionState);
-		};
-
-		pc.onsignalingstatechange = () => {
-			console.log("signaling:", pc.signalingState);
-		};
-
 		ws.onmessage = (event) => {
 			const message: WsMessage = JSON.parse(event.data);
 
 			if (message.type === "session-init") {
 				clientIdRef.current = message.clientId;
-				participants.current = message.participants;
+				setParticipants(message.participants);
 
 				createOffers(message.clientId, message.participants);
 				return;
@@ -136,6 +124,20 @@ const App = () => {
 				handleAnswer(pc, message);
 				return;
 			}
+
+			if (message.type === "connect") {
+				console.log("Client connected");
+				setParticipants((prev) => [...prev, message.clientId]);
+				return;
+			}
+
+			if (message.type === "disconnect") {
+				console.log("Client disconnected");
+				setParticipants((prev) => [
+					...prev.filter((clientId) => clientId != message.clientId),
+				]);
+				return;
+			}
 		};
 
 		return () => {
@@ -161,6 +163,7 @@ const App = () => {
 			</header>
 
 			<main className="p-4">
+				{participants.join(", ")}
 				<div className="border rounded p-4 h-80 overflow-y-auto mb-4">
 					{messages.length === 0 ? (
 						<p className="text-gray-500">No messages yet</p>
