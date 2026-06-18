@@ -1,19 +1,20 @@
 import { XIcon } from "lucide-react";
 import { useEffect } from "react";
+
 import { useChatStore } from "./store/useChatStore";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "./components/ui/tabs";
 
 const App = () => {
-	const { messages, peers, ws, pc, sendMessage, setupConnection } =
+	const { messages, peers, sendMessage, setupConnection, closeConnection } =
 		useChatStore();
 
 	useEffect(() => {
 		setupConnection();
 
 		return () => {
-			if (ws && ws.readyState === WebSocket.OPEN) ws.close();
-			if (pc && pc.connectionState === "connected") pc.close();
+			closeConnection();
 		};
-	}, [setupConnection, ws, pc]);
+	}, [setupConnection, closeConnection]);
 
 	const sendHelloMessage = () => {
 		sendMessage("Hello from WebRTC!");
@@ -26,6 +27,19 @@ const App = () => {
 				<XIcon />
 			</header>
 
+			<Tabs defaultValue="account" className="w-100">
+				<TabsList>
+					<TabsTrigger value="account">Account</TabsTrigger>
+					<TabsTrigger value="password">Password</TabsTrigger>
+				</TabsList>
+				<TabsContent value="account">
+					Make changes to your account here.
+				</TabsContent>
+				<TabsContent value="password">
+					Change your password here.
+				</TabsContent>
+			</Tabs>
+
 			<main className="p-4">
 				{peers.map((peer) => peer.id).join(", ")}
 				<div className="border rounded p-4 h-80 overflow-y-auto mb-4">
@@ -34,7 +48,9 @@ const App = () => {
 					) : (
 						messages.map((message, index) => (
 							<div key={index} className="mb-2">
-								{message}
+								{message.from}
+								{": "}
+								{message.body}
 							</div>
 						))
 					)}

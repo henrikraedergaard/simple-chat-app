@@ -1,36 +1,43 @@
 import { useChatStore } from "../store/useChatStore";
 import type { AnswerMessage, OfferMessage } from "../types/ws-message";
+import { createPeerConnection } from "../utils/create-peer-connection";
 
 export async function handleOffer(message: OfferMessage) {
 	console.log("Received offer");
 
 	const chat = useChatStore.getState();
-	if (!chat.ws || !chat.pc || !chat.clientId) {
+	if (!chat.ws || !chat.clientId) {
 		console.warn("Missing clientId");
 		return;
 	}
 
-	chat.pc.ondatachannel = (event) => {
-		const channel = event.channel;
+	let peer = chat.getPeer(message.from);
+	if (!peer) {
+		peer = createPeerConnection(message.from);
+		useChatStore.getState().upsertPeer(peer);
+	}
 
-		channel.onmessage = (messageEvent) => {
+	peer.pc.ondatachannel = (event) => {
+		peer.channel = event.channel;
+
+		peer.channel.onmessage = (messageEvent) => {
 			useChatStore.setState((prev) => ({
 				messages: [...prev.messages, messageEvent.data],
 			}));
 		};
 
-		useChatStore.setState((prev) => ({
-			peers: [
-				...prev.peers.filter((peer) => peer.id !== message.from),
-				{ id: message.from, channel },
-			],
-		}));
+		useChatStore.getState().upsertPeer(peer);
 	};
 
-	await chat.pc.setRemoteDescription(message.offer);
+	await peer.pc.setRemoteDescription(message.offer);
 
-	const answer = await chat.pc.createAnswer();
-	await chat.pc.setLocalDescription(answer);
+	for (const candidate of peer.pendingCandidates) {
+		await peer.pc.addIceCandidate(new RTCIceCandidate(candidate));
+	}
+	peer.pendingCandidates = [];
+
+	const answer = await peer.pc.createAnswer();
+	await peer.pc.setLocalDescription(answer);
 
 	const response: AnswerMessage = {
 		type: "answer",

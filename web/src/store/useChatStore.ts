@@ -2,69 +2,57 @@ import type { UUID } from "crypto";
 import { create } from "zustand";
 import { handleAnswer } from "../handlers/handle-answer";
 import { handleCandidate } from "../handlers/handle-candidate";
+import { handleConnect } from "../handlers/handle-connect";
+import { handleDisconnect } from "../handlers/handle-disconnect";
 import { handleOffer } from "../handlers/handle-offer";
 import { handlePing } from "../handlers/handle-ping";
 import { handleSessionInit } from "../handlers/handle-session-init";
-import type { CandidateMessage, WsMessage } from "../types/ws-message";
-
-export type Peer = {
-	id: UUID;
-	channel: RTCDataChannel;
-};
+import type { Peer } from "../types/peer";
+import type { WsMessage } from "../types/ws-message";
+import type { ChatMessage } from "../types/chat-message";
 
 interface ChatStore {
 	ws?: WebSocket;
-	pc?: RTCPeerConnection;
 	clientId?: UUID;
 	peers: Peer[];
-	messages: string[];
+	messages: ChatMessage[];
 	setupConnection: () => void;
+	closeConnection: () => void;
+	upsertPeer: (peer: Peer) => void;
+	getPeer: (peerId: UUID) => Peer | undefined;
+	removePeer: (peerId: UUID) => void;
 	sendMessage: (msg: string) => void;
 }
 
-export const useChatStore = create<ChatStore>()((set, get) => ({
+export const useChatStore = create<ChatStore>((set, get) => ({
 	ws: undefined,
-	pc: undefined,
 	clientId: undefined,
 	peers: [],
 	messages: [],
+	upsertPeer: (peer) => {
+		set((prev) => ({
+			peers: [
+				...prev.peers.filter((existing) => existing.id !== peer.id),
+				peer,
+			],
+		}));
+	},
+	getPeer: (peerId) => get().peers.find((peer) => peer.id === peerId),
+	removePeer: (peerId) => {
+		set((prev) => ({
+			peers: prev.peers.filter((peer) => peer.id !== peerId),
+		}));
+	},
 	setupConnection: () => {
 		// Stop setup if there already is a connection
 		const existing = get();
-		if (existing.ws || existing.pc) {
-			console.warn("Skipping conneciton setup. ws or pc already exist");
+		if (existing.ws) {
+			console.warn("Skipping conneciton setup. ws already exists");
 			return;
 		}
 
-		// Setup conneciton to websocket and peer-connection
+		// Setup connection to websocket and peer signaling
 		const ws = new WebSocket("ws://localhost:3000/ws");
-		const pc = new RTCPeerConnection({
-			iceServers: [
-				{
-					urls: "stun:stun.l.google.com:19302",
-				},
-			],
-		});
-
-		pc.onicecandidate = (event) => {
-			if (!event.candidate) return;
-			const chat = useChatStore.getState();
-			if (!chat.clientId) {
-				console.warn("missing clientId");
-				return;
-			}
-			if (!chat.ws) {
-				console.warn("missing ws");
-				return;
-			}
-
-			const message: CandidateMessage = {
-				type: "candidate",
-				candidate: event.candidate,
-				from: chat.clientId,
-			};
-			chat.ws.send(JSON.stringify(message));
-		};
 
 		ws.onmessage = (event) => {
 			const message: WsMessage = JSON.parse(event.data);
@@ -91,12 +79,11 @@ export const useChatStore = create<ChatStore>()((set, get) => ({
 					break;
 
 				case "connect":
-					// handleConnect(message);
-					console.log("Connected");
+					handleConnect(message);
 					break;
 
 				case "disconnect":
-					console.log("Disconnected");
+					handleDisconnect(message);
 					break;
 
 				default:
@@ -106,23 +93,53 @@ export const useChatStore = create<ChatStore>()((set, get) => ({
 
 		set(() => ({
 			ws,
-			pc,
 		}));
+	},
+	closeConnection: () => {
+		const chat = get();
+
+		if (chat.ws && chat.ws.readyState === WebSocket.OPEN) chat.ws.close();
+
+		for (const peer of chat.peers) {
+			peer.channel?.close();
+			peer.pc.close();
+		}
 	},
 	sendMessage: (msg) => {
 		const chat = get();
-		if (!chat.peers) {
+		if (!chat.peers.length) {
 			console.warn("missing peers");
 			return;
 		}
-		console.log(chat.peers.length);
 
-		for (const peer of chat.peers) {
-			console.log("Send message to peer");
-			console.log(peer.id);
-			peer.channel.send("Hello from WebRTC!");
+		if (!chat.clientId) {
+			console.warn("Missing clientId");
+			return;
 		}
 
-		set((prev) => ({ messages: [...prev.messages, msg] }));
+		const message: ChatMessage = {
+			id: crypto.randomUUID(),
+			from: chat.clientId,
+			body: msg,
+		};
+
+		const messageString = JSON.stringify(message);
+
+		let sent = false;
+		for (const peer of chat.peers) {
+			if (!peer.channel || peer.channel.readyState !== "open") {
+				continue;
+			}
+
+			peer.channel.send(messageString);
+			sent = true;
+		}
+
+		if (!sent) {
+			console.warn("no open data channels");
+			return;
+		}
+
+		set((prev) => ({ messages: [...prev.messages, message] }));
 	},
 }));

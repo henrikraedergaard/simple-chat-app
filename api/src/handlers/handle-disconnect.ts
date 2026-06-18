@@ -31,4 +31,6 @@ export function handleDisconnect(ws: WSContext<WebSocket>) {
 
 		client.ws.send(JSON.stringify(disconnectMessage));
 	}
+
+	console.log(`Num of clients: ${JSON.stringify(clients, null, 2)}`);
 }
