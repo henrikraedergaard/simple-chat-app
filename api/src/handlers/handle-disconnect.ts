@@ -18,7 +18,10 @@ export function handleDisconnect(ws: WSContext<WebSocket>) {
 		}
 	}
 
-	if (!oldClient) return;
+	if (!oldClient) {
+		console.warn("missing client");
+		return;
+	}
 
 	for (const client of clients) {
 		const disconnectMessage: DisconnectMessage = {
