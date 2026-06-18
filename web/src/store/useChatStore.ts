@@ -22,6 +22,7 @@ interface ChatStore {
 	getPeer: (peerId: UUID) => Peer | undefined;
 	removePeer: (peerId: UUID) => void;
 	sendMessage: (msg: string) => void;
+	sendSystemMessage: (msg: string) => void;
 }
 
 export const useChatStore = create<ChatStore>((set, get) => ({
@@ -120,6 +121,43 @@ export const useChatStore = create<ChatStore>((set, get) => ({
 		const message: ChatMessage = {
 			id: crypto.randomUUID(),
 			from: chat.clientId,
+			body: msg,
+		};
+
+		const messageString = JSON.stringify(message);
+
+		let sent = false;
+		for (const peer of chat.peers) {
+			if (!peer.channel || peer.channel.readyState !== "open") {
+				continue;
+			}
+
+			peer.channel.send(messageString);
+			sent = true;
+		}
+
+		if (!sent) {
+			console.warn("no open data channels");
+			return;
+		}
+
+		set((prev) => ({ messages: [...prev.messages, message] }));
+	},
+	sendSystemMessage: (msg) => {
+		const chat = get();
+		if (!chat.peers.length) {
+			console.warn("missing peers");
+			return;
+		}
+
+		if (!chat.clientId) {
+			console.warn("Missing clientId");
+			return;
+		}
+
+		const message: ChatMessage = {
+			id: crypto.randomUUID(),
+			from: "system",
 			body: msg,
 		};
 

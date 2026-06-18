@@ -32,5 +32,17 @@ export async function handleConnect(message: ConnectMessage) {
 		offer,
 	};
 
+	console.log("User joined");
+
+	useChatStore.setState((prev) => ({
+		messages: [
+			...prev.messages,
+			{
+				id: crypto.randomUUID(),
+				body: `${message.clientId} joined!`,
+				from: "system",
+			},
+		],
+	}));
 	chat.ws.send(JSON.stringify(offerMessage));
 }

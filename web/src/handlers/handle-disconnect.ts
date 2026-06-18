@@ -7,4 +7,15 @@ export function handleDisconnect(message: DisconnectMessage) {
 	peer?.channel?.close();
 	peer?.pc.close();
 	chat.removePeer(message.clientId);
+
+	useChatStore.setState((prev) => ({
+		messages: [
+			...prev.messages,
+			{
+				id: crypto.randomUUID(),
+				body: `${message.clientId} disconnected!`,
+				from: "system",
+			},
+		],
+	}));
 }
