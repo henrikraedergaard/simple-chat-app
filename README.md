@@ -2,7 +2,8 @@
 
 ## Getting started
 
-Run `docker compose up`
+1. Run `docker compose up`
+2. Open http://localhost:80
 
 ## Message protocol
 
