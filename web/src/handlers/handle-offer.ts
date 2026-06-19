@@ -21,8 +21,10 @@ export async function handleOffer(message: OfferMessage) {
 		peer.channel = event.channel;
 
 		peer.channel.onmessage = (messageEvent) => {
+			const message = JSON.parse(messageEvent.data);
+
 			useChatStore.setState((prev) => ({
-				messages: [...prev.messages, messageEvent.data],
+				messages: [...prev.messages, message],
 			}));
 		};
 

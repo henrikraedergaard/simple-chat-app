@@ -79,7 +79,7 @@ const App = () => {
 											<div key={index}>
 												{message.from === "system" ? (
 													<div>
-														<p className="font-semibold italic">
+														<p className="font-semibold text-gray-500 italic">
 															{message.body}
 														</p>
 													</div>

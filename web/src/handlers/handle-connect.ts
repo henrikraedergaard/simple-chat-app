@@ -25,13 +25,6 @@ export async function handleConnect(message: ConnectMessage) {
 	const offer = await peer.pc.createOffer();
 	await peer.pc.setLocalDescription(offer);
 
-	const offerMessage: OfferMessage = {
-		type: "offer",
-		to: message.clientId,
-		from: chat.clientId,
-		offer,
-	};
-
 	console.log("User joined");
 
 	useChatStore.setState((prev) => ({
@@ -44,5 +37,12 @@ export async function handleConnect(message: ConnectMessage) {
 			},
 		],
 	}));
+
+	const offerMessage: OfferMessage = {
+		type: "offer",
+		to: message.clientId,
+		from: chat.clientId,
+		offer,
+	};
 	chat.ws.send(JSON.stringify(offerMessage));
 }
