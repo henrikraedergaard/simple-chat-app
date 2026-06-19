@@ -12,9 +12,9 @@
 
 Missing:
 [x] Fix bug with channel connection
-[ ] Delete own messages
-[ ] Edit own messages
+[x] Delete own messages
+[x] Edit own messages
 [ ] Virtualize the list
-[ ] Add Compose and Dockerfile file
+[x] Add Compose and Dockerfile file
 [ ] Testing Unit and Integration
 [ ] More visually appealing names
