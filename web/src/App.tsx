@@ -1,22 +1,14 @@
-import { SendIcon, XIcon } from "lucide-react";
-import { useEffect, useState } from "react";
+import { XIcon } from "lucide-react";
+import { useEffect } from "react";
 
-import { useChatStore } from "./store/useChatStore";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "./components/ui/tabs";
+import ChatTabContent from "./components/chat/ChatTabContent";
+import ParticipantsTabContent from "./components/chat/ParticipantsTabContent";
 import { Button } from "./components/ui/button";
-import { Textarea } from "./components/ui/textarea";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "./components/ui/tabs";
+import { useChatStore } from "./store/useChatStore";
 
 const App = () => {
-	const {
-		messages,
-		peers,
-		clientId,
-		sendMessage,
-		setupConnection,
-		closeConnection,
-	} = useChatStore();
-
-	const [text, setText] = useState("");
+	const { peers, setupConnection, closeConnection } = useChatStore();
 
 	useEffect(() => {
 		setupConnection();
@@ -25,11 +17,6 @@ const App = () => {
 			closeConnection();
 		};
 	}, [setupConnection, closeConnection]);
-
-	const sendHelloMessage = () => {
-		sendMessage(text);
-		setText("");
-	};
 
 	return (
 		<main className="bg-gray-100 w-screen h-screen">
@@ -44,7 +31,7 @@ const App = () => {
 				</header>
 				<main className="p-4 flex flex-1 min-h-0">
 					<Tabs
-						defaultValue="participants"
+						defaultValue="chat"
 						className="flex flex-1 min-h-0 flex-col"
 					>
 						<TabsList className="mb-4">
@@ -57,73 +44,13 @@ const App = () => {
 							value="participants"
 							className="flex-1 min-h-0"
 						>
-							<ul className="flex flex-col gap-4">
-								<li>{clientId}</li>
-								{peers.map((peer) => (
-									<li>{peer.id}</li>
-								))}
-							</ul>
+							<ParticipantsTabContent />
 						</TabsContent>
 						<TabsContent
 							value="chat"
 							className="flex flex-1 min-h-0 flex-col gap-4"
 						>
-							<div className="flex-1 min-h-0 overflow-y-auto">
-								{messages.length === 0 ? (
-									<p className="text-gray-500">
-										No messages yet
-									</p>
-								) : (
-									<ul className="flex flex-col gap-4">
-										{messages.map((message, index) => (
-											<div key={index}>
-												{message.from === "system" ? (
-													<div>
-														<p className="font-semibold text-gray-500 italic">
-															{message.body}
-														</p>
-													</div>
-												) : (
-													<div>
-														<p className="font-semibold">
-															{message.from}
-														</p>
-														<p>{message.body}</p>
-													</div>
-												)}
-											</div>
-										))}
-									</ul>
-								)}
-							</div>
-
-							<div className="relative shrink-0">
-								<Textarea
-									value={text}
-									onKeyDown={(event) => {
-										if (
-											event.key !== "Enter" ||
-											event.shiftKey
-										) {
-											return;
-										}
-
-										event.preventDefault();
-										sendHelloMessage();
-									}}
-									onChange={(e) => setText(e.target.value)}
-									className="resize-none rounded-sm min-h-24"
-									placeholder="Write to everyone"
-								></Textarea>
-								<Button
-									variant="ghost"
-									className="absolute bottom-2 right-2"
-									size="icon-lg"
-									onClick={sendHelloMessage}
-								>
-									<SendIcon size={1000} />
-								</Button>
-							</div>
+							<ChatTabContent />
 						</TabsContent>
 					</Tabs>
 				</main>

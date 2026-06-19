@@ -23,6 +23,8 @@ interface ChatStore {
 	removePeer: (peerId: UUID) => void;
 	sendMessage: (msg: string) => void;
 	sendSystemMessage: (msg: string) => void;
+	deleteMessage: (msgId: UUID) => void;
+	editMessage: (msgId: UUID, newBody: string) => void;
 }
 
 export const useChatStore = create<ChatStore>((set, get) => ({
@@ -120,6 +122,7 @@ export const useChatStore = create<ChatStore>((set, get) => ({
 
 		const message: ChatMessage = {
 			id: crypto.randomUUID(),
+			type: "new",
 			from: chat.clientId,
 			body: msg,
 		};
@@ -157,6 +160,7 @@ export const useChatStore = create<ChatStore>((set, get) => ({
 
 		const message: ChatMessage = {
 			id: crypto.randomUUID(),
+			type: "new",
 			from: "system",
 			body: msg,
 		};
@@ -179,5 +183,93 @@ export const useChatStore = create<ChatStore>((set, get) => ({
 		}
 
 		set((prev) => ({ messages: [...prev.messages, message] }));
+	},
+	deleteMessage: (msgId) => {
+		const chat = get();
+		if (!chat.peers.length) {
+			console.warn("missing peers");
+			return;
+		}
+
+		if (!chat.clientId) {
+			console.warn("Missing clientId");
+			return;
+		}
+
+		const message: ChatMessage = {
+			id: msgId,
+			type: "delete",
+			from: chat.clientId,
+			body: `Deleted message ${msgId}`,
+		};
+
+		const messageString = JSON.stringify(message);
+
+		let sent = false;
+		for (const peer of chat.peers) {
+			if (!peer.channel || peer.channel.readyState !== "open") {
+				continue;
+			}
+
+			peer.channel.send(messageString);
+			sent = true;
+		}
+
+		if (!sent) {
+			console.warn("no open data channels");
+			return;
+		}
+
+		set((prev) => ({
+			messages: prev.messages.filter((chat) => chat.id !== msgId),
+		}));
+	},
+	editMessage: (msgId, newBody) => {
+		const chat = get();
+		if (!chat.peers.length) {
+			console.warn("missing peers");
+			return;
+		}
+
+		if (!chat.clientId) {
+			console.warn("Missing clientId");
+			return;
+		}
+
+		const message: ChatMessage = {
+			id: msgId,
+			type: "edit",
+			from: chat.clientId,
+			body: newBody,
+		};
+
+		const messageString = JSON.stringify(message);
+
+		let sent = false;
+		for (const peer of chat.peers) {
+			if (!peer.channel || peer.channel.readyState !== "open") {
+				continue;
+			}
+
+			peer.channel.send(messageString);
+			sent = true;
+		}
+
+		if (!sent) {
+			console.warn("no open data channels");
+			return;
+		}
+
+		set((prev) => ({
+			messages: prev.messages.map((chat) => {
+				if (chat.id === message.id) {
+					return {
+						...chat,
+						body: message.body,
+					};
+				}
+				return chat;
+			}),
+		}));
 	},
 }));

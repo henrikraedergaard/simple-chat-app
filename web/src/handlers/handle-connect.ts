@@ -32,6 +32,7 @@ export async function handleConnect(message: ConnectMessage) {
 			...prev.messages,
 			{
 				id: crypto.randomUUID(),
+				type: "new",
 				body: `${message.clientId} joined!`,
 				from: "system",
 			},

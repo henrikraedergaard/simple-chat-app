@@ -13,6 +13,7 @@ export function handleDisconnect(message: DisconnectMessage) {
 			...prev.messages,
 			{
 				id: crypto.randomUUID(),
+				type: "new",
 				body: `${message.clientId} left!`,
 				from: "system",
 			},

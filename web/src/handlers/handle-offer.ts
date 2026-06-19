@@ -1,3 +1,4 @@
+import type { ChatMessage } from "@/types/chat-message";
 import { useChatStore } from "../store/useChatStore";
 import type { AnswerMessage, OfferMessage } from "../types/ws-message";
 import { createPeerConnection } from "../utils/create-peer-connection";
@@ -21,11 +22,37 @@ export async function handleOffer(message: OfferMessage) {
 		peer.channel = event.channel;
 
 		peer.channel.onmessage = (messageEvent) => {
-			const message = JSON.parse(messageEvent.data);
+			const message: ChatMessage = JSON.parse(messageEvent.data);
 
-			useChatStore.setState((prev) => ({
-				messages: [...prev.messages, message],
-			}));
+			switch (message.type) {
+				case "new":
+					useChatStore.setState((prev) => ({
+						messages: [...prev.messages, message],
+					}));
+					break;
+
+				case "delete":
+					useChatStore.setState((prev) => ({
+						messages: prev.messages.filter(
+							(chat) => chat.id !== message.id,
+						),
+					}));
+					break;
+
+				case "edit":
+					useChatStore.setState((prev) => ({
+						messages: prev.messages.map((chat) => {
+							if (chat.id === message.id) {
+								return {
+									...chat,
+									body: message.body,
+								};
+							}
+							return chat;
+						}),
+					}));
+					break;
+			}
 		};
 
 		useChatStore.getState().upsertPeer(peer);
