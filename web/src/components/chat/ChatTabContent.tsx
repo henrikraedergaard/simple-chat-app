@@ -135,6 +135,7 @@ const ChatTabContent = () => {
 			<div className="relative shrink-0">
 				<Textarea
 					value={text}
+					id="main-textarea"
 					onKeyDown={(event) => {
 						if (event.key !== "Enter" || event.shiftKey) {
 							return;
@@ -150,6 +151,7 @@ const ChatTabContent = () => {
 				<Button
 					variant="ghost"
 					className="absolute bottom-2 right-2"
+					id="send-button"
 					size="icon-lg"
 					onClick={sendHelloMessage}
 				>

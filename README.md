@@ -10,11 +10,14 @@
 2. Then activate environment `source venv/bin/activate`
 3. Lastly install packages using ``
 
-Missing:
-[x] Fix bug with channel connection
-[x] Delete own messages
-[x] Edit own messages
-[ ] Virtualize the list
-[x] Add Compose and Dockerfile file
-[ ] Testing Unit and Integration
-[ ] More visually appealing names
+# Message protocol
+
+Here comes the message protocol used in this application
+
+# Others
+
+- How to build and run the application
+- Brief description of your message protocol
+- Which architecture option you chose, and why
+- Time spent
+- Trade-offs, known issues, and what you’d improve with more time
